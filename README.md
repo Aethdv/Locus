@@ -1,4 +1,5 @@
-# Locus v1.4.3
+# Locus v1.5.0
+
 CPU benchmarking tool with computational multi-workload types.<br>
 (Targeting ~99–100% load. Use `btop` or equivalent to monitor temperatures.)<br>
 [![Crates.io](https://img.shields.io/crates/v/locus-cli.svg)](https://crates.io/crates/locus-cli)
@@ -42,9 +43,6 @@ CPU benchmarking tool with computational multi-workload types.<br>
 # Build optimized release binary
 cargo build --release
 
-# Run with auto-detected cores until Ctrl+C
-./target/release/locus
-
 # Run for 10 seconds with 8 threads, float workload
 ./target/release/locus -w float -d 10 -j 8
 
@@ -72,11 +70,11 @@ cargo build --release
 ┌──────────────────┬─────────────┬──────────┬─────────────────┐
 │ Workload         │    Rate     │ Relative │ Per-Thread Rate │
 ├──────────────────┼─────────────┼──────────┼─────────────────┤
-│ Integer          │   12.70B /s │    48.0x │      793.45M /s │
-│ Float            │  349.29M /s │     1.3x │       21.83M /s │
-│ Mixed            │  264.62M /s │     1.0x │       16.54M /s │
-│ Memory-Latency   │  105.94M /s │     0.4x │        6.62M /s │
-│ Memory-Bandwidth │   32.99M /s │     0.1x │        2.06M /s │
+│ Integer          │   13.16B /s │    50.5x │      822.26M /s │
+│ Float            │  328.38M /s │     1.3x │       20.52M /s │
+│ Mixed            │  260.57M /s │     1.0x │       16.29M /s │
+│ Memory-Latency   │  105.92M /s │     0.4x │        6.62M /s │
+│ Memory-Bandwidth │   33.50M /s │     0.1x │        2.09M /s │
 └──────────────────┴─────────────┴──────────┴─────────────────┘
 ```
 
@@ -92,13 +90,13 @@ cargo bench
 cargo clippy --all-targets -- -D warnings -D clippy::nursery
 
 # Format check
-cargo fmt --all
+cargo +nightly fmt --all
 ```
 
 ## CLI options
 ```bash
 BASIC OPTIONS:
-  -d, --duration <SECS>        Duration in seconds (0 = unlimited)        [default: 0]
+  -d, --duration <SECS>        Duration in seconds                        [default: 10]
   -j, --threads <NUM>          Worker threads (0 = auto-detect)           [default: 0]
   -w, --workload <TYPE>        Workload: integer|float|memory-latency|
                                memory-bandwidth|mixed                     [default: mixed]
@@ -116,5 +114,6 @@ ADVANCED OPTIONS:
   -h, --help                   Print help
   -V, --version                Print version
 ```
+
 # License
 This project is licensed under the [MIT](https://github.com/Aethdv/CPU_stress/blob/main/LICENSE) License.
