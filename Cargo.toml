@@ -11,7 +11,7 @@ categories = ["command-line-utilities", "development-tools::profiling"]
 edition = "2024"
 rust-version = "1.88.0"
 
-include = ["src/**", "Cargo.toml", "README.md", "LICENSE*"]
+include = ["src/**", "benches/**","Cargo.toml", "README.md", "LICENSE*"]
 
 [dependencies]
 clap = { version = "4.5.53", features = ["derive", "string"] }
