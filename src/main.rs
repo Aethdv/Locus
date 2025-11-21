@@ -37,7 +37,9 @@ fn main() {
     let global_stop = Arc::new(AtomicBool::new(false));
     {
         let gs = Arc::clone(&global_stop);
+        // Set Ctrl+C handler to signal all threads to stop
         if let Err(e) = ctrlc::set_handler(move || {
+            // RELEASE ordering matches the ACQUIRE in the worker threads
             gs.store(true, Ordering::Release);
         }) {
             eprintln!("Warning: Failed to set global Ctrl+C handler: {}", e);
@@ -50,6 +52,9 @@ fn main() {
         args.threads
     };
 
+    // If memory is auto-detected, this value will be passed to the allocator,
+    // which will then round it down to the nearest Power of 2 for performance
+    // reasons.
     let memory_mb = if args.memory_mb == 0 {
         system::detect_memory_size(args.memory_multiplier)
     } else {
@@ -65,7 +70,7 @@ fn main() {
 
 fn run_benchmark_mode(args: &Args, num_threads: usize, memory_mb: usize) {
     if args.duration == 0 {
-        eprintln!("Error: --benchmark requires --duration to be set (e.g., -d 60)");
+        eprintln!("Error: --benchmark requires --duration to be set (e.g. -d 60)");
         std::process::exit(1);
     }
 
@@ -82,6 +87,7 @@ fn run_benchmark_mode(args: &Args, num_threads: usize, memory_mb: usize) {
     } else {
         println!("  Memory buf: {} MB per thread (manual)", memory_mb);
     }
+    println!("  (Buffers are rounded down to nearest Power-of-2 for efficiency)");
 
     println!("  Batch size: {}", format_number(args.batch_size));
     println!("  Duration:   {}s per workload", args.duration);
@@ -138,6 +144,7 @@ fn run_single_mode(args: &Args, num_threads: usize, memory_mb: usize) {
     } else {
         println!("  Memory buf: {} MB per thread (manual)", memory_mb);
     }
+    println!("  Note: Buffers rounded to nearest Power-of-2 to avoid DIV overhead.");
 
     println!(
         "  Duration:   {}",

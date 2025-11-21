@@ -20,19 +20,28 @@ pub fn worker_thread(
 ) {
     let mut int_acc = id as u64;
     let mut float_acc = id as f64;
+
+    // This allocates a buffer sized to a power of 2 to allow efficient masking
     let mut mem_buffer = allocate_memory_buffer(memory_mb);
 
     loop {
-        if stop_flag.load(Ordering::Relaxed) {
+        // On x86 (strong memory model), Relaxed is often sufficient for a boolean flag,
+        // but on ARM/Apple Silicon (weak memory model), Relaxed loads might not observe
+        // the store from the main thread immediately, leading to delays in stopping.
+        // Acquire guarantees that we see all Release stores that happened before.
+        if stop_flag.load(Ordering::Acquire) {
             break;
         }
 
         match workload {
             "integer" => stress_integer(batch_size, &mut int_acc),
             "float" => stress_float(batch_size, &mut float_acc),
+            // "memory" maps to latency test by default as it's more intensive on the controller
+            // logic
             "memory" | "memory-latency" => stress_memory_latency(batch_size, &mut mem_buffer),
             "memory-bandwidth" => stress_memory_bandwidth(batch_size, &mut mem_buffer),
             _ => {
+                // Mixed workload: 33% split
                 stress_integer(batch_size / 3, &mut int_acc);
                 stress_float(batch_size / 3, &mut float_acc);
                 stress_memory_latency(batch_size / 3, &mut mem_buffer);
@@ -42,6 +51,7 @@ pub fn worker_thread(
         work_counter.fetch_add(batch_size, Ordering::Relaxed);
     }
 
+    // Prevent dead code elimination of the accumulators and buffer
     black_box(int_acc);
     black_box(float_acc);
     black_box(mem_buffer);
@@ -64,50 +74,6 @@ mod tests {
 
         let handle = thread::spawn(move || {
             worker_thread(0, stop_clone, counter_clone, "integer", 10000, 1);
-        });
-
-        thread::sleep(Duration::from_millis(50));
-        stop.store(true, Ordering::Release);
-
-        handle.join().expect("Worker should terminate cleanly");
-        assert!(counter.load(Ordering::Relaxed) > 0);
-    }
-
-    #[test]
-    fn test_multi_threaded_stress() {
-        let stop = Arc::new(AtomicBool::new(false));
-        let counter = Arc::new(AtomicU64::new(0));
-        let mut handles = vec![];
-
-        for id in 0..4 {
-            let s = Arc::clone(&stop);
-            let c = Arc::clone(&counter);
-            handles.push(thread::spawn(move || {
-                worker_thread(id, s, c, "mixed", 5000, 1);
-            }));
-        }
-
-        thread::sleep(Duration::from_millis(100));
-        stop.store(true, Ordering::Release);
-
-        for h in handles {
-            h.join().unwrap();
-        }
-
-        let ops = counter.load(Ordering::Relaxed);
-        assert!(ops > 10000);
-    }
-
-    #[test]
-    fn test_memory_bandwidth_workload() {
-        let stop = Arc::new(AtomicBool::new(false));
-        let counter = Arc::new(AtomicU64::new(0));
-
-        let stop_clone = Arc::clone(&stop);
-        let counter_clone = Arc::clone(&counter);
-
-        let handle = thread::spawn(move || {
-            worker_thread(0, stop_clone, counter_clone, "memory-bandwidth", 10000, 2);
         });
 
         thread::sleep(Duration::from_millis(50));

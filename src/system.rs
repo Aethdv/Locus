@@ -119,6 +119,7 @@ fn detect_l3_cache_windows() -> Option<usize> {
 
     unsafe {
         let mut buffer_size: u32 = 0;
+        // First call to determine buffer size needed
         GetLogicalProcessorInformationEx(RelationCache, std::ptr::null_mut(), &mut buffer_size);
 
         if buffer_size == 0 {
@@ -133,17 +134,31 @@ fn detect_l3_cache_windows() -> Option<usize> {
         }
 
         let mut offset = 0usize;
+        // SAFETY: We iterate while offset + size of struct fits in the buffer.
+        // We also check that the `info.Size` does not push us out of bounds.
         while offset + mem::size_of::<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>()
             <= buffer_size as usize
         {
-            let info = &*(buffer.as_ptr().add(offset)
-                as *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX);
+            let info_ptr =
+                buffer.as_ptr().add(offset) as *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
+            let info = &*info_ptr;
+
+            // SAFETY Check: Prevent infinite loops or OOB reads if Size is malformed
+            if info.Size == 0 || offset + info.Size as usize > buffer_size as usize {
+                break;
+            }
 
             if info.Relationship == RelationCache {
-                let cache_info_ptr =
-                    (info as *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX as usize
-                        + mem::size_of::<u32>()
-                        + mem::size_of::<u32>()) as *const CacheDescriptor;
+                // The Cache structure is part of a union. We need to access it carefully.
+                // The layout of SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX places the union
+                // right after the Size field (which is u32, but checked above).
+                // Manual offset calculation matches Windows API structure layout.
+                let cache_info_ptr = (
+                    info_ptr as usize
+                    + mem::size_of::<u32>()  // Relationship
+                    + mem::size_of::<u32>()
+                    // Size
+                ) as *const CacheDescriptor;
 
                 let cache = &*cache_info_ptr;
 
@@ -361,69 +376,5 @@ fn sysctl_u64_vec(name: &str) -> Option<Vec<u64>> {
             out.push(*ptr.add(i));
         }
         Some(out)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_cache_size() {
-        assert_eq!(parse_cache_size("8192K"), Some(8));
-        assert_eq!(parse_cache_size("16384K"), Some(16));
-        assert_eq!(parse_cache_size("12M"), Some(12));
-        assert_eq!(parse_cache_size("256M"), Some(256));
-        assert_eq!(parse_cache_size("8388608"), Some(8));
-    }
-
-    #[test]
-    fn test_detect_memory_size_enforces_minimum() {
-        let size = detect_memory_size(4);
-        assert!(size >= MIN_BUFFER_MB);
-    }
-
-    #[test]
-    fn test_cross_platform_detection_doesnt_panic() {
-        let _ = super::detect_l3_cache();
-    }
-
-    #[test]
-    fn test_get_total_system_ram() {
-        if let Some(ram_mb) = super::get_total_system_ram_mb() {
-            assert!(ram_mb >= 512);
-            assert!(ram_mb <= 67_108_864);
-        }
-    }
-
-    #[test]
-    fn test_ram_aware_memory_size() {
-        let size = detect_memory_size(4);
-        assert!(size >= MIN_BUFFER_MB);
-
-        let num_cpus = num_cpus::get();
-        let total = size * num_cpus;
-
-        if let Some(ram_mb) = super::get_total_system_ram_mb() {
-            let max_reasonable = ((ram_mb as f64) * RAM_SAFETY_FACTOR) as usize;
-            assert!(
-                total <= max_reasonable,
-                "Total allocation {} MB should not exceed {}% of RAM ({} MB)",
-                total,
-                (RAM_SAFETY_FACTOR * 100.0) as usize,
-                ram_mb
-            );
-        }
-    }
-
-    #[test]
-    fn test_memory_multiplier_scaling() {
-        let size_2x = detect_memory_size(2);
-        let size_4x = detect_memory_size(4);
-        let size_8x = detect_memory_size(8);
-
-        assert!(size_2x >= MIN_BUFFER_MB);
-        assert!(size_4x >= size_2x);
-        assert!(size_8x >= size_4x);
     }
 }

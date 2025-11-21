@@ -3,35 +3,38 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(name = "locus")]
-#[command(version, about = "CPU stress test with memory subsystem pressure", long_about = None)]
+#[command(version, about = "CPU Benchmarking tool with computational multi-workload types", long_about = None)]
 pub struct Args {
-    #[arg(short, long, default_value_t = 0)]
+    // 0 = run until Ctrl+C
+    #[arg(short, long, default_value_t = 10)]
     pub duration: u64,
 
+    // 0 = auto-detect all cores
     #[arg(short = 'j', long, default_value_t = 0)]
     pub threads: usize,
 
+    // Workload type
     #[arg(short, long, default_value = "mixed")]
     #[arg(value_parser = ["integer", "float", "memory", "memory-latency", "memory-bandwidth", "mixed"])]
     pub workload: String,
 
-    /// 0 = auto-detect, overrides -x
+    // 0 = auto-detect, overrides -x
     #[arg(short = 'm', long, default_value_t = 0)]
     pub memory_mb: usize,
 
-    /// 2=light, 4=balanced, 8=aggressive, 16=extreme
+    // 2=light, 4=balanced, 8=aggressive, 16=extreme
     #[arg(short = 'x', long, default_value_t = 4)]
     pub memory_multiplier: usize,
 
-    /// Iterations between stop checks
+    // Iterations between stop checks
     #[arg(short, long, default_value_t = 100_000)]
     pub batch_size: u64,
 
-    /// Disable progress reporting
+    // Disable progress reporting
     #[arg(short, long)]
     pub quiet: bool,
 
-    /// Run all workloads sequentially
+    // Run all workloads sequentially
     #[arg(short = 'B', long)]
     pub benchmark: bool,
 }
@@ -50,7 +53,7 @@ pub fn print_help() {
     let reset = Style::new();
 
     println!("{}locus{} {}", cmd, reset, env!("CARGO_PKG_VERSION"));
-    println!("A configurable CPU stress testing tool with multiple computational workloads.\n");
+    println!("CPU Benchmarking tool with computational multi-workload types\n");
 
     println!("{}USAGE:{}", header, reset);
     println!("    {}locus{} [OPTIONS]\n", cmd, reset);
@@ -62,7 +65,7 @@ pub fn print_help() {
         opt, reset, opt, reset, value, reset
     );
     println!(
-        "      {}Duration in seconds (0 = run until Ctrl+C) [default: 0]{}",
+        "      {}Duration in seconds (0 = run until Ctrl+C) [default: 10]{}",
         desc, reset
     );
 
@@ -164,20 +167,8 @@ pub fn print_help() {
     );
     println!("  {}locus{} -w memory-latency -d 10 -x 8\n", cmd, reset);
 
-    println!(
-        "  {}# Run memory bandwidth workload (parallel streams){}",
-        example, reset
-    );
-    println!("  {}locus{} -w memory-bandwidth -d 10 -x 8\n", cmd, reset);
-
-    println!("  {}# Run full benchmark suite{}", example, reset);
-    println!("  {}locus{} --benchmark -d 10 -x 8\n", cmd, reset);
-
-    println!(
-        "  {}# Manual memory size override (512 MB per thread){}",
-        example, reset
-    );
-    println!("  {}locus{} -w memory-bandwidth -m 512 -d 10", cmd, reset);
+    println!("  {}# Run indefinitely (until Ctrl+C){}", example, reset);
+    println!("  {}locus{} -d 0\n", cmd, reset);
 }
 
 pub fn print_version() {
